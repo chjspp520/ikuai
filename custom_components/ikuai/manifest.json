@@ -1,0 +1,13 @@
+{
+  "domain": "ikuai",
+  "name": "ikuai",  
+  "codeowners": ["@chjspp520"],
+  "config_flow": true,
+  "dependencies": ["http"],
+  "documentation": "https://github.com/chjspp520/ikuai",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/chjspp520/ikuai/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

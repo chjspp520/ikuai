@@ -1,0 +1,487 @@
+api_call:
+  name: 通用API调用
+  description: 直接调用爱快 /Action/call 接口（高级逃生舱，参数错误可能影响路由运行）
+  fields:
+    entry_id:
+      name: 配置条目ID
+      description: 多台爱快时指定目标配置条目，留空使用第一台
+      example: "可选"
+      selector:
+        text:
+    func_name:
+      name: 功能模块
+      description: 爱快 func_name，如 wan、dhcp_lease、syslog-sysevent
+      required: true
+      example: "wan"
+      selector:
+        text:
+    action:
+      name: 动作
+      description: 如 show、seting、add、del、up、down
+      required: true
+      example: "show"
+      selector:
+        text:
+    param:
+      name: 参数
+      description: 请求 param 对象（YAML 字典）
+      example: {"TYPE": "total,data", "limit": "0,10"}
+      selector:
+        object:
+
+wake_on_lan:
+  name: 网络唤醒
+  description: 通过爱快发送网络唤醒魔术包（WOL）
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    mac:
+      name: MAC地址
+      description: 目标设备 MAC 地址
+      required: true
+      example: "aa:bb:cc:dd:ee:ff"
+      selector:
+        text:
+
+wan_reconnect:
+  name: WAN线路重连
+  description: 重连指定 WAN 线路（PPPoE 或 DHCP）
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    id:
+      name: 线路ID
+      description: 物理 WAN 口 ID，默认为 1
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 200
+          mode: box
+    mode:
+      name: 拨号方式
+      default: pppoe
+      selector:
+        select:
+          options:
+            - value: pppoe
+              label: PPPoE拨号
+            - value: dhcp
+              label: DHCP动态获取
+
+terminal_disconnect:
+  name: 踢终端下线
+  description: 强制指定 IP 的在线终端断开连接
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    ip:
+      name: 终端IP
+      required: true
+      example: "192.168.10.100"
+      selector:
+        text:
+
+mac_block:
+  name: MAC拉黑（禁止上网）
+  description: 添加 MAC 备注并加入 MAC 访问控制黑名单
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    mac:
+      name: MAC地址
+      required: true
+      example: "aa:bb:cc:dd:ee:ff"
+      selector:
+        text:
+    comment:
+      name: 备注
+      default: HA
+      selector:
+        text:
+
+mac_unblock:
+  name: MAC放行（恢复上网）
+  description: 将 MAC 从访问控制黑名单中删除
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    mac:
+      name: MAC地址
+      required: true
+      example: "aa:bb:cc:dd:ee:ff"
+      selector:
+        text:
+
+log_get:
+  name: 查询分类日志
+  description: 即时查询爱快日志中心（系统/操作/认证/ARP/无线/DHCP/DDNS/拨号/推送/终端上下线/网址/IM），并返回数据
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    category:
+      name: 日志分类
+      description: system/webadmin/pppauth/arp/apaction/dhcpd/ddns/wanpppoe/notice/terminal_log/url_log/im_log
+      required: true
+      default: system
+      selector:
+        select:
+          options:
+            - system
+            - webadmin
+            - pppauth
+            - arp
+            - apaction
+            - dhcpd
+            - ddns
+            - wanpppoe
+            - notice
+            - terminal_log
+            - url_log
+            - im_log
+    limit:
+      name: 返回条数
+      default: 50
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+
+log_clear:
+  name: 清空分类日志
+  description: 清空爱快指定分类日志（all 为全部，谨慎操作）
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    category:
+      name: 日志分类
+      required: true
+      example: "system"
+      selector:
+        text:
+
+alarms_read_all:
+  name: 告警全部已读
+  description: 将爱快系统告警全部标记为已读
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+
+wan_line_add:
+  name: 添加多拨线路
+  description: >-
+    在物理 WAN 口上添加一条拨号/上网线路（对应原版 Web 内外网设置的"添加拨号/VLAN"）。
+    internet=2 为 ADSL/PPPoE（需填账号密码），0 为静态 IP（需填 ip_mask/gateway），
+    1 为 DHCP 动态获取。返回爱快响应。
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    interface:
+      name: 物理WAN接口
+      description: 绑定的物理网卡，如 wan1
+      required: true
+      example: "wan1"
+      selector:
+        text:
+    vlan_id:
+      name: VLAN_ID
+      description: VLAN 编号（0-4090），单线多拨各条不同；QINQ 形如 100.10
+      required: true
+      example: "100"
+      selector:
+        text:
+    vlan_name:
+      name: 线路名称
+      description: 拨号线路名，如 adsl1（同网卡下不可重复）
+      required: true
+      example: "adsl1"
+      selector:
+        text:
+    internet:
+      name: 入网方式
+      default: 2
+      selector:
+        select:
+          options:
+            - value: "2"
+              label: ADSL/PPPoE拨号
+            - value: "0"
+              label: 静态IP
+            - value: "1"
+              label: DHCP动态获取
+    enabled:
+      name: 添加后立即启用
+      default: true
+      selector:
+        boolean:
+    comment:
+      name: 备注
+      selector:
+        text:
+    default_route:
+      name: 作为默认线路
+      description: 加入默认路由（默认网关）
+      default: false
+      selector:
+        boolean:
+    username:
+      name: 宽带账号
+      description: PPPoE 账号（internet=2）
+      selector:
+        text:
+    passwd:
+      name: 宽带密码
+      description: PPPoE 密码（internet=2，明文填写即可）
+      selector:
+        text:
+    mtu:
+      name: MTU
+      default: 1480
+      selector:
+        number: {min: 576, max: 1500, mode: box}
+    mru:
+      name: MRU
+      default: 1480
+      selector:
+        number: {min: 576, max: 1500, mode: box}
+    disc_auto_switch:
+      name: 掉线自动切换
+      default: false
+      selector:
+        boolean:
+    check_link_mode:
+      name: 线路体检模式
+      selector:
+        number: {min: 0, max: 3, mode: box}
+    check_link_host:
+      name: 体检目标地址
+      example: "www.baidu.com"
+      selector:
+        text:
+    ip_mask:
+      name: IP/掩码
+      description: 静态IP/DHCP 模式使用，如 192.168.1.2/24，多个 IP 逗号分隔
+      example: "192.168.1.2/24"
+      selector:
+        text:
+    gateway:
+      name: 网关
+      selector:
+        text:
+    mac:
+      name: MAC地址
+      description: 克隆 MAC，留空使用默认
+      selector:
+        text:
+    link_time:
+      name: 在线时段
+      description: 如 00:00-24:00
+      default: "00:00-00:00"
+      selector:
+        text:
+
+wan_line_edit:
+  name: 编辑多拨线路
+  description: 修改已有拨号/上网线路的全部参数（参数同添加，需额外提供线路 id）
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    id:
+      name: 线路ID
+      description: 多拨线路行 ID（见设备传感器属性）
+      required: true
+      selector:
+        number: {min: 1, max: 100000, mode: box}
+    interface:
+      name: 物理WAN接口
+      required: true
+      example: "wan1"
+      selector:
+        text:
+    vlan_id:
+      name: VLAN_ID
+      required: true
+      selector:
+        text:
+    vlan_name:
+      name: 线路名称
+      required: true
+      selector:
+        text:
+    internet:
+      name: 入网方式
+      default: 2
+      selector:
+        select:
+          options:
+            - value: "2"
+              label: ADSL/PPPoE拨号
+            - value: "0"
+              label: 静态IP
+            - value: "1"
+              label: DHCP动态获取
+    enabled:
+      name: 启用
+      default: true
+      selector:
+        boolean:
+    comment:
+      name: 备注
+      selector:
+        text:
+    default_route:
+      name: 作为默认线路
+      default: false
+      selector:
+        boolean:
+    username:
+      name: 宽带账号
+      selector:
+        text:
+    passwd:
+      name: 宽带密码
+      selector:
+        text:
+    mtu:
+      name: MTU
+      default: 1480
+      selector:
+        number: {min: 576, max: 1500, mode: box}
+    mru:
+      name: MRU
+      default: 1480
+      selector:
+        number: {min: 576, max: 1500, mode: box}
+    ip_mask:
+      name: IP/掩码
+      selector:
+        text:
+    gateway:
+      name: 网关
+      selector:
+        text:
+    mac:
+      name: MAC地址
+      selector:
+        text:
+
+wan_line_del:
+  name: 删除多拨线路
+  description: 删除指定的多拨（VLAN 拨号）线路，谨慎操作
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    id:
+      name: 线路ID
+      required: true
+      selector:
+        number: {min: 1, max: 100000, mode: box}
+
+stream_updown_add:
+  name: 添加上下行分离
+  description: >-
+    添加上下行分离规则（流控分流）：上行流量走 upiface，其下行回传走 downiface。
+    线路名见原版 Web（如 wan1、adsl1），可调用 api_call 查询
+    func_name=stream_updown, action=show, param={TYPE:"interface,protocol"} 获取。
+    传入 id 时变为编辑该规则。返回爱快响应。
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    upiface:
+      name: 上传线路
+      required: true
+      example: "wan1"
+      selector:
+        text:
+    downiface:
+      name: 下载线路
+      required: true
+      example: "adsl1"
+      selector:
+        text:
+    protocol:
+      name: 协议
+      default: any
+      selector:
+        select:
+          options:
+            - value: any
+              label: 全部
+            - value: tcp
+              label: TCP
+            - value: udp
+              label: UDP
+            - value: tcp_udp
+              label: TCP+UDP
+            - value: icmp
+              label: ICMP
+    src_addr:
+      name: 源地址
+      description: IP/MAC 分组或地址段表达式（与 Web 一致），留空为所有
+      selector:
+        text:
+    dst_addr:
+      name: 目标地址
+      selector:
+        text:
+    src_port:
+      name: 源端口
+      description: 协议为 any/icmp 时强制留空
+      selector:
+        text:
+    dst_port:
+      name: 目标端口
+      selector:
+        text:
+    comment:
+      name: 备注
+      selector:
+        text:
+    enabled:
+      name: 启用
+      default: true
+      selector:
+        boolean:
+    id:
+      name: 规则ID
+      description: 传入则执行编辑而非新增
+      selector:
+        number: {min: 1, max: 100000, mode: box}
+
+stream_updown_del:
+  name: 删除上下行分离规则
+  fields:
+    entry_id:
+      name: 配置条目ID
+      selector:
+        text:
+    id:
+      name: 规则ID
+      required: true
+      selector:
+        number: {min: 1, max: 100000, mode: box}
