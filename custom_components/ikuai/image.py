@@ -22,6 +22,7 @@
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 
@@ -93,6 +94,8 @@ class IKuaiVmScreenImage(ForcedEntityIdMixin, ImageEntity):
         self._attr_available = False
         # 上一轮"有没有开机"：用来抓"开机后的第一帧"（见 _handle_coordinator_update）
         self._was_running: bool | None = None
+        # 上一次写状态时的 (state, 属性) 签名，用于跳过无变化的写入
+        self._last_state_signature = None
         # 固定英文实体 ID：image.ikuai_vm_<虚拟机名>_screen（名字取不到 ascii 时退回 ID）
         name_slug = entity_id_slug(self._fallback.get("name")) or str(suffix)
         self._setup_forced_entity_id("image", f"vm_{name_slug}_screen")
@@ -204,6 +207,20 @@ class IKuaiVmScreenImage(ForcedEntityIdMixin, ImageEntity):
         self._cached_image = None
 
     # ------------------------------------------------------------------ 生命周期
+    def _state_signature(self):
+        """(state, 属性快照, 可用性) 签名；没变化就不重写状态。
+
+        本类没有继承 :class:`IKuaiEntity`（它要的是 ``ImageEntity`` 而非
+        ``CoordinatorEntity``），所以签名方法得自己带一份 —— 协调器每轮轮询都会
+        调到下面这个监听器，虚拟机的屏幕画面绝大多数时候是静止的，没必要每轮写状态。
+        """
+        try:
+            attrs = self.extra_state_attributes or {}
+            payload = json.dumps(attrs, sort_keys=True, default=str)
+            return (self.state, payload, self.available)
+        except Exception:  # pylint: disable=broad-except
+            return None
+
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
         self.async_on_remove(
@@ -226,4 +243,8 @@ class IKuaiVmScreenImage(ForcedEntityIdMixin, ImageEntity):
         if running and self._was_running is not True and self._png is None:
             self.hass.async_create_task(self._async_capture())
         self._was_running = running
+        signature = self._state_signature()
+        if signature is not None and signature == self._last_state_signature:
+            return
+        self._last_state_signature = signature
         self.async_write_ha_state()

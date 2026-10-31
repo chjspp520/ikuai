@@ -1,4 +1,5 @@
 """IKUAI Entities"""
+import json
 import logging
 from homeassistant.components.device_tracker import ScannerEntity
 from homeassistant.core import callback
@@ -65,6 +66,8 @@ class IKUAITracker(ForcedEntityIdMixin, ScannerEntity):
         self._is_connected = False 
         self._attrs = {}
         self._querytime = ""
+        # 上一次写状态时的 (state, 属性) 签名，用于跳过无变化的写入
+        self._last_state_signature = None
 
         self._custom_name = self._info.get("name", self._target_id)
 
@@ -126,10 +129,27 @@ class IKUAITracker(ForcedEntityIdMixin, ScannerEntity):
         # 注册表里的旧 ID（拼音）在这里迁移到固定英文 ID
         self.async_migrate_entity_id()
 
+    def _state_signature(self):
+        """(state, 属性快照, 可用性) 签名；没变化就不重写状态。
+
+        本类没继承 ``IKuaiEntity``（ScannerEntity 不是 CoordinatorEntity），
+        签名方法得自己带一份（与 image 平台同理）。
+        """
+        try:
+            attrs = self.extra_state_attributes or {}
+            payload = json.dumps(attrs, sort_keys=True, default=str)
+            return (self.state, payload, self.available)
+        except Exception:  # pylint: disable=broad-except
+            return None
+
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self._update_state()
+        signature = self._state_signature()
+        if signature is not None and signature == self._last_state_signature:
+            return
+        self._last_state_signature = signature
         self.async_write_ha_state()
 
     def _update_state(self):

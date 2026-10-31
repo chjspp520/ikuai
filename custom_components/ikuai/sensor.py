@@ -1602,6 +1602,11 @@ class IKuaiAllEntitiesSensor(IKuaiEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self):
         self._payload = None
+        # 聚合类实体属性体量大，没变化时不要重写（详见 IKuaiEntity 的说明）
+        signature = self._state_signature()
+        if signature is not None and signature == self._last_state_signature:
+            return
+        self._last_state_signature = signature
         self.async_write_ha_state()
 
     @callback

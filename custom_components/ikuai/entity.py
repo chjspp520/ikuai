@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import datetime
 import functools
+import json
 import logging
 import re
 from urllib.parse import unquote, urlparse
@@ -108,6 +109,22 @@ def normalize_attributes(value, _depth=0):
     if isinstance(value, tuple):
         return tuple(normalize_attributes(v, _depth + 1) for v in value)
     return decode_url_text(value)
+
+
+# 每次轮询都会变的字段：不进实体属性。
+#   recorder 是按「属性内容」去重的，``querytime`` 每 10 秒变一次会让去重完全失效 ——
+#   79 个实体 × 每 10 秒 = 每小时 2.8 万条新属性行（实测占全库新增属性行的 100%），
+#   进而把 recorder 的写库开销放大成常驻内存增长。抓取时刻只在日志/诊断里有用，
+#   不值得为它付出这个代价（需要时看 coordinator.data["querytime"] 即可）。
+_VOLATILE_ATTR_KEYS = frozenset({"querytime", "query_time"})
+
+
+def export_attributes(value):
+    """属性出口：URL 编码还原 + 时间戳转可读时间 + 剔除每次轮询都变的字段。"""
+    cleaned = normalize_attributes(value)
+    if isinstance(cleaned, dict):
+        cleaned = {k: v for k, v in cleaned.items() if k not in _VOLATILE_ATTR_KEYS}
+    return cleaned
 
 
 # ---------------------------------------------------------------------------
@@ -763,7 +780,7 @@ class ForcedEntityIdMixin:
 
             @functools.wraps(getter)
             def wrapped(self):
-                return normalize_attributes(getter(self))
+                return export_attributes(getter(self))
 
             cls.extra_state_attributes = property(wrapped)
         elif callable(attr):
@@ -772,7 +789,7 @@ class ForcedEntityIdMixin:
 
             @functools.wraps(attr)
             def wrapped(self, *args, **kwargs):
-                return normalize_attributes(attr(self, *args, **kwargs))
+                return export_attributes(attr(self, *args, **kwargs))
 
             cls.extra_state_attributes = wrapped
         else:
@@ -852,6 +869,35 @@ class IKuaiEntity(ForcedEntityIdMixin, CoordinatorEntity):
         super().__init__(coordinator)
         self.host = coordinator.host
         self.entry_id = getattr(coordinator, "entry_id", None)
+        # 上一次写状态时的 (state, 属性) 签名，用于跳过无变化的写入
+        self._last_state_signature = None
+
+    def _state_signature(self):
+        """(state, 属性快照, 可用性) 签名；属性里剔除每次轮询都变的字段。"""
+        try:
+            attrs = self.extra_state_attributes or {}
+            if isinstance(attrs, dict):
+                attrs = {k: v for k, v in attrs.items()
+                         if k not in _VOLATILE_ATTR_KEYS}
+            payload = json.dumps(attrs, sort_keys=True, default=str)
+            return (self.state, payload, self.available)
+        except Exception:  # pylint: disable=broad-except
+            return None
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """状态与属性都没变就直接跳过，不写状态。
+
+        爱快是 10 秒轮询、79 个实体，其中大量是「认证服务器」「CPU 型号」
+        「固件版本」这类几乎不变的静态值，原先每轮都无条件写一次 state，
+        每小时产生约 3 万条状态 + 2.8 万条唯一属性行，是 recorder 的主要压力源。
+        实测停掉 recorder 后常驻内存不再增长，所以这里做一次脏检查。
+        """
+        signature = self._state_signature()
+        if signature is not None and signature == self._last_state_signature:
+            return
+        self._last_state_signature = signature
+        super()._handle_coordinator_update()
 
     @property
     def device_info(self):
